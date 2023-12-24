@@ -185,13 +185,13 @@ clear:
 
 # For Lazy To Do Git Command
 .PHONY: lazy_git
-COMMIT_MESSAGE ?= $(shell bash -c 'read -p "Commit Message: " commit_message; echo $$commit_message')
+COMMIT_MESSAGE ?= $(shell powershell -Command "Read-Host -Prompt 'Commit Message'")
 lazy_git:
 	git pull
 	git add README.md makefile .gitignore $(INCLUDE_DIR) $(SRC_DIR) $(LIBS_CPP)
 	git commit -m "$(COMMIT_MESSAGE)"
-	git push -u origin 
-
+	git push -u origin
+	
 endif
 
 
