@@ -51,13 +51,17 @@ $(TARGET): $(OBJS) $(CUSTOM_DYNAMIC_LIBS) $(CUSTOM_STATIC_LIBS)
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CXX) $(CXX_FLAGS) -c $< -o $@ 
 
+# Compile .cpp code in libs into .o objects files
+$(LIB_DIR)/%.o: $(LIBS_CPP_DIR)/%.cpp
+	$(CXX) $(CXX_FLAGS) -c $< -o $@ 
+
+# Build Static Libraries
+$(LIB_DIR)/lib%.a: $(LIB_DIR)/%.o
+	ar rcs $@ $<
+
 # Build Dynamic Libraries
 $(BIN_DIR)/lib%.so: $(LIBS_CPP_DIR)/%.cpp
 	$(CXX) $(CXX_FLAGS) -fPIC -shared -o $@ $< 
-
-# Build Static Libraries
-$(LIB_DIR)/lib%.a: $(LIBS_CPP_DIR)/%.cpp
-	ar rcs $@ $<
 
 #--------------------------------------------------------------------------------------------
 
@@ -87,6 +91,14 @@ clean:
 clear:
 	@$(RM_DIR) $(BIN_DIR) $(OBJ_DIR) $(LIB_DIR) $(KEY_DIR)
 	@clear
+
+# For Lazy To Do Git Command
+.PHONY: lazy_git
+COMMIT_MESSAGE ?= $(shell bash -c 'read -p "Commit Message: " commit_message; echo $$commit_message')
+lazy_git:
+	git add README.md makefile .gitignore $(INCLUDE_DIR) $(SRC_DIR) $(LIBS_CPP)
+	git commit -m "$(COMMIT_MESSAGE)"
+	git push -u origin 
 
 else ifeq ($(OS),Windows_NT)
 # Configuration File For Compile And Linking In Windows_NT 
