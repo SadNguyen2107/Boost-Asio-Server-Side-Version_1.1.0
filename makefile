@@ -193,6 +193,3 @@ lazy_git:
 	git push -u origin
 	
 endif
-
-
-
