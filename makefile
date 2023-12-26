@@ -9,7 +9,7 @@ ifeq ($(shell uname -s),Linux)
 # Configuration File For Compile And Linking In Linux x86_64 OS 
 CXX 		= g++
 CXX_FLAGS 	= -std=c++20 -Wall
-LINK_LIBS 	= -lsqlite3 -lcrypto
+LINK_LIBS 	= -lsqlite3 -lcrypto -lboost_system
 
 # Current Directory
 CURRENT_PATH 	= $(shell pwd)
@@ -72,8 +72,13 @@ build_directories:
 
 # Run this command to run the program
 .PHONY: run
-run: $(TARGET)
+run: 
 	LD_LIBRARY_PATH="$(CURRENT_PATH)/$(BIN_DIR)" ./$(BIN_DIR)/$(TARGET) $(LINK_LIBS) 
+
+# Run this command to check for memory leak
+.PHONY: valgrind
+valgrind: 
+	LD_LIBRARY_PATH="$(CURRENT_PATH)/$(BIN_DIR)" valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --verbose --log-file=valgrind-log.log  ./$(BIN_DIR)/$(TARGET) $(LINK_LIBS) 
 
 # To File all the Linker Libraries Need Before Run
 .PHONY: shared
@@ -105,7 +110,7 @@ else ifeq ($(OS),Windows_NT)
 # Configuration File For Compile And Linking In Windows_NT 
 CXX 		= x86_64-w64-mingw32-g++
 CXX_FLAGS 	= -std=c++20 -Wall
-LIBS 		= -lsqlite3 -lcrypto
+LIBS 		= -lsqlite3 -lcrypto -lboost_system-mt
 
 # Current Directory
 CURRENT_PATH 	= $(shell pwd)
@@ -168,7 +173,7 @@ build_directories:
 
 # Run this command to run the program
 .PHONY: run
-run: $(TARGET)
+run: 
 	LD_LIBRARY_PATH="$(CURRENT_PATH)/$(BIN_DIR)" ./$(BIN_DIR)/$(TARGET) $(LINK_LIBS) 
 
 # Clean all the Production Files
