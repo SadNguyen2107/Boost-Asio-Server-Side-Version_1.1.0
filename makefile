@@ -111,7 +111,7 @@ lazy_git:
 else ifeq ($(OS),Windows_NT)
 # Configuration File For Compile And Linking In Windows_NT 
 CXX 		= x86_64-w64-mingw32-g++
-CXX_FLAGS 	= -std=c++20 -Wall 
+CXX_FLAGS 	= -std=c++20 -Wall -Werror
 STD_LIBS 	= -lsqlite3 -lcrypto -lboost_system-mt -lboost_filesystem-mt -lwsock32 -lws2_32
 
 # Current Directory
