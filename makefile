@@ -8,8 +8,8 @@ TARGET = main
 ifeq ($(shell uname -s),Linux)
 # Configuration File For Compile And Linking In Linux x86_64 OS 
 CXX 		= g++
-CXX_FLAGS 	= -std=c++20 -Wall
-LINK_LIBS 	= -lsqlite3 -lcrypto -lboost_system
+CXX_FLAGS 	= -std=c++20 -Wall -Werror
+STD_LIBS 	= -lsqlite3 -lcrypto -lboost_system -lboost_filesystem
 
 # Current Directory
 CURRENT_PATH 	= $(shell pwd)
@@ -33,7 +33,7 @@ CUSTOM_STATIC_LIBS 		= $(patsubst %, $(LIB_DIR)/lib%.a, $(basename $(notdir $(LI
 OBJS 					= $(patsubst %, $(OBJ_DIR)/%, $(notdir $(SRCS:.cpp=.o)))
 
 # Change the Linker to add the CUSTOM LIBS
-LINK_LIBS 		+= $(addprefix -l, $(basename $(notdir $(LIBS_CPP))))
+LINK_LIBS 		= $(addprefix -l, $(basename $(notdir $(LIBS_CPP)))) 
 
 # Common Commands
 MK_DIR 	= mkdir -p
@@ -45,13 +45,15 @@ all: build_directories $(TARGET)
 #--------------------------------------------------------------------------------------------
 # Make Executable Files
 $(TARGET): $(OBJS) $(CUSTOM_DYNAMIC_LIBS) $(CUSTOM_STATIC_LIBS)
-	LD_LIBRARY_PATH="$(CURRENT_PATH)/$(BIN_DIR)" $(CXX) -o $(BIN_DIR)/$@ $(OBJS) $(LINK_LIBS) -L"$(CURRENT_PATH)/$(BIN_DIR)"
+	LD_LIBRARY_PATH="$(CURRENT_PATH)/$(BIN_DIR)" $(CXX) -o $(BIN_DIR)/$@ $(OBJS) $(LINK_LIBS) $(STD_LIBS) -L"$(CURRENT_PATH)/$(BIN_DIR)"
 
 # Compile .c and .cpp code into object files
+# Compile Source Files
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CXX) $(CXX_FLAGS) -c $< -o $@ 
 
 # Compile .cpp code in libs into .o objects files
+# Compile libs_cp -> .o file to make static_lib
 $(LIB_DIR)/%.o: $(LIBS_CPP_DIR)/%.cpp
 	$(CXX) $(CXX_FLAGS) -c $< -o $@ 
 
@@ -73,7 +75,7 @@ build_directories:
 # Run this command to run the program
 .PHONY: run
 run: 
-	LD_LIBRARY_PATH="$(CURRENT_PATH)/$(BIN_DIR)" ./$(BIN_DIR)/$(TARGET) $(LINK_LIBS) 
+	LD_LIBRARY_PATH="$(CURRENT_PATH)/$(BIN_DIR)" ./$(BIN_DIR)/$(TARGET) $(LINK_LIBS) $(STD_LIBS) -L"$(CURRENT_PATH)/$(BIN_DIR)"
 
 # Run this command to check for memory leak
 .PHONY: valgrind
@@ -109,8 +111,8 @@ lazy_git:
 else ifeq ($(OS),Windows_NT)
 # Configuration File For Compile And Linking In Windows_NT 
 CXX 		= x86_64-w64-mingw32-g++
-CXX_FLAGS 	= -std=c++20 -Wall
-LIBS 		= -lsqlite3 -lcrypto -lboost_system-mt
+CXX_FLAGS 	= -std=c++20 -Wall 
+STD_LIBS 	= -lsqlite3 -lcrypto -lboost_system-mt -lboost_filesystem-mt -lwsock32 -lws2_32
 
 # Current Directory
 CURRENT_PATH 	= $(shell pwd)
@@ -134,7 +136,7 @@ CUSTOM_STATIC_LIBS 		= $(patsubst %, $(LIB_DIR)/lib%.a, $(basename $(notdir $(LI
 OBJS 					= $(patsubst %, $(OBJ_DIR)/%, $(notdir $(SRCS:.cpp=.o)))
 
 # Change the Linker to add the CUSTOM LIBS
-LINK_LIBS 		+= $(addprefix -l, $(basename $(notdir $(LIBS_CPP))))
+LINK_LIBS 		= $(addprefix -l, $(basename $(notdir $(LIBS_CPP))))
 
 # Common Commands
 MK_DIR 	= mkdir -p
@@ -146,13 +148,15 @@ all: build_directories $(TARGET)
 #--------------------------------------------------------------------------------------------
 # Make Executable Files
 $(TARGET): $(OBJS) $(CUSTOM_DYNAMIC_LIBS) $(CUSTOM_STATIC_LIBS)
-	LD_LIBRARY_PATH="$(CURRENT_PATH)/$(BIN_DIR)" $(CXX) -o $(BIN_DIR)/$@ $(OBJS) $(LINK_LIBS) -L"$(CURRENT_PATH)/$(BIN_DIR)"
+	LD_LIBRARY_PATH="$(CURRENT_PATH)/$(BIN_DIR)" $(CXX) -o $(BIN_DIR)/$@ $(OBJS) $(LINK_LIBS) $(STD_LIBS) -L"$(CURRENT_PATH)/$(BIN_DIR)"
 
 # Compile .c and .cpp code into object files
+# From src Folder
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CXX) $(CXX_FLAGS) -c $< -o $@ 
 
 # Compile .cpp code in libs into .o objects files
+# Compile into.o files to make static_lib
 $(LIB_DIR)/%.o: $(LIBS_CPP_DIR)/%.cpp
 	$(CXX) $(CXX_FLAGS) -c $< -o $@ 
 
@@ -160,9 +164,14 @@ $(LIB_DIR)/%.o: $(LIBS_CPP_DIR)/%.cpp
 $(LIB_DIR)/lib%.a: $(LIB_DIR)/%.o
 	ar rcs $@ $<
 
-# Build Dynamic Libraries
-$(BIN_DIR)/lib%.dll: $(LIBS_CPP_DIR)/%.cpp
+$(BIN_DIR)/libencode_decode_base64.dll: $(LIBS_CPP_DIR)/encode_decode_base64.cpp
 	$(CXX) $(CXX_FLAGS) -fPIC -shared -o $@ $< 
+
+$(BIN_DIR)/libsimdjson.dll: $(LIBS_CPP_DIR)/simdjson.cpp
+	$(CXX) $(CXX_FLAGS) -fPIC -shared -o $@ $< 
+
+$(BIN_DIR)/libServer.dll: $(LIBS_CPP_DIR)/Server.cpp
+	$(CXX) $(CXX_FLAGS) -fPIC -shared -o $@ $< -lencode_decode_base64 $(STD_LIBS) -L"$(CURRENT_PATH)/$(BIN_DIR)"
 
 #--------------------------------------------------------------------------------------------
 
@@ -174,7 +183,7 @@ build_directories:
 # Run this command to run the program
 .PHONY: run
 run: 
-	LD_LIBRARY_PATH="$(CURRENT_PATH)/$(BIN_DIR)" ./$(BIN_DIR)/$(TARGET) $(LINK_LIBS) 
+	LD_LIBRARY_PATH="$(CURRENT_PATH)/$(BIN_DIR)" ./$(BIN_DIR)/$(TARGET) $(LINK_LIBS) $(STD_LIBS) -L"$(CURRENT_PATH)/$(BIN_DIR)"
 
 # Clean all the Production Files
 .PHONY: clean

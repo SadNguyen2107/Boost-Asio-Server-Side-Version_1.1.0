@@ -1,8 +1,11 @@
 #include <utility> // Include this line before Boost.Asio headers
 #include "../include/Server.h"
+#include "../include/encode_decode_base64.h"
+#include <iostream>
+#include <csignal>
 
 using namespace SN_Server;
-
+using namespace JB_Encode_Decode_Base64;
 void HandleSignal(int signal);
 
 // The Server
@@ -13,11 +16,13 @@ int main(int argc, char const *argv[])
     // Make a Signal To Turn Off the Server
     std::signal(SIGINT, HandleSignal);
 
-    server = std::make_shared<Server>("127.0.0.1", 6969);
+    server = std::make_shared<Server>("172.29.163.214", 6969);
 
     // Start The Server
     server->Start();
 
+    // While The Server is Running
+    // Do Something 
     while (server->IsRunning())
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));

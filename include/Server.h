@@ -5,10 +5,7 @@
 #include <boost/asio.hpp>
 #include "./config/export_libs.h"
 #include <memory>
-#include <string>
 #include <stdint.h>
-#include <iostream>
-#include <csignal>
 #include <thread>
 #include <atomic>
 #include <set>
@@ -40,6 +37,9 @@ namespace SN_Server
         // To Store All The Client Connections
         std::set<std::shared_ptr<boost::asio::ip::tcp::socket>> clientsConnections;
 
+        // Chunk Size of Data to Send
+        std::size_t CHUNK_SIZE = 255;
+
         //! PRIVATE METHODS SECTIONS
         //!========================================================
         //* Methods To Accept new Connection
@@ -60,15 +60,29 @@ namespace SN_Server
 
         bool IsRunning();
 
+        // Set-Get The Chunk of data
+        void SetChunkData(std::size_t new_chunk_size);
+        std::size_t GetChunkData() const;
+
+        //========================================================================================================================
         // Simple I/O Send Protocol
-        void SendText(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, std::string_view text);
-        void SendJSON(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, std::string_view json_file_directory);
-        void SendFile(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, std::string_view file_directory);
+        void SendText(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, const std::string_view& text);
+
+        // For Sending Text-Based Formats Files
+        void SendTextBasedFile(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, const std::string& file_to_send);
+
+        // For Sending Binary Formats Files
+        void SendBinaryFile(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, const std::string& file_to_send);
         
+        //========================================================================================================================
         // Simple I/O Get Protocol
-        void GetText();
-        void GetJSON();
-        void SendFile();
+        void GetText(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, std::string &received_text);
+
+        // For Receiving Text-Based Formats Files
+        void GetTextBasedFile(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, const std::string &file_to_store);
+
+        // For Receiving Binary Formats Files
+        void GetBinaryFile(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, const std::string &file_to_store);
     };
 }
 
