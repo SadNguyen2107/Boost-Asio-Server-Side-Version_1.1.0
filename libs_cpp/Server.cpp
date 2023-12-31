@@ -308,7 +308,11 @@ namespace SN_Server
         while (std::getline(text_file, chunk, static_cast<char>(EOF)) && !chunk.empty())
         {
             // Synchronous write
-            std::size_t bytes_sent = boost::asio::write(*client_socket, boost::asio::buffer(chunk), error);
+            std::size_t bytes_sent = boost::asio::write(
+                *client_socket,
+                boost::asio::buffer(chunk), 
+                error
+            );
 
             // Check Whether Error Happen
             if (!error)
