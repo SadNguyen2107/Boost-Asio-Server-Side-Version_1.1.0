@@ -46,6 +46,9 @@ namespace SN_Server
         // Chunk Size of Data to Send/Get
         std::size_t CHUNK_SIZE = 255;
 
+        // End Signal of the Text
+        std::string_view end_signal = "|end";
+
         //! PRIVATE METHODS SECTIONS
         //!========================================================
         //* Methods To Accept new Connection
@@ -70,7 +73,14 @@ namespace SN_Server
         void SetChunkData(std::size_t new_chunk_size);
         std::size_t GetChunkData() const;
 
+        // Set-Get End Signal of the data
+        void SetEndSignal(const std::string_view& end_signal);
+        std::string_view GetEndSignal() const;
+
         //========================================================================================================================
+        //! IMPORTANT: Send End Signal
+        void SendEndSignal(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket);
+        
         // Simple I/O Send Protocol
         void SendText(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, const std::string_view& text);
 
@@ -79,9 +89,10 @@ namespace SN_Server
 
         // For Sending Binary Formats Files
         void SendBinaryFile(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, const std::string& file_to_send);
-        
+
         //========================================================================================================================
         // Simple I/O Get Protocol
+        // INFO: To End the Sending remember to add |end
         ClientConnectionStatus GetText(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, std::string &received_text);
 
         // For Receiving Text-Based Formats Files

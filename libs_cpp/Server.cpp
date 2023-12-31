@@ -133,6 +133,54 @@ namespace SN_Server
         return this->CHUNK_SIZE;
     }
 
+    /**
+     * @brief Change A New End Signal to send to the Client
+     * Default: |end
+     * 
+     * @param end_signal new end_signal
+     */
+    void Server::SetEndSignal(const std::string_view& end_signal)
+    {
+        if (end_signal != "")
+        {
+            this->end_signal = end_signal;
+        }
+    }
+
+    /**
+     * @brief Get the current end_signal
+     * 
+     * @return std::string_view return the end_signal
+     */
+    std::string_view Server::GetEndSignal() const
+    {
+        return this->end_signal;
+    }
+
+    /**
+     * @brief Send an end signal to the client_socket
+     * 
+     * @param client_socket the client_socket to send
+     */
+    void Server::SendEndSignal(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket)
+    {
+        // Error if Thrown
+        boost::system::error_code error;
+
+        // Send an end signal of the Text
+        boost::asio::write(
+            *client_socket,
+            boost::asio::buffer(this->end_signal),
+            error
+        );
+
+        // Check error
+        if (error)
+        {
+            std::cerr << "Error: " << error.message() << std::endl;
+        }
+    }
+
     //* INFO: For Sending Protocol Method
     /**
      * @brief For Sending Simple Text To a Specify client_socket
@@ -145,14 +193,20 @@ namespace SN_Server
         // The Variable To check For The Bytes Have Send
         std::size_t total_sent = 0;
 
+        // Error if Thrown
+        boost::system::error_code error;
+
         // Send every CHUNK_SIZE character per send
         for (size_t index = 0; index < text.size(); index += this->CHUNK_SIZE)
         {
             std::string_view chunk = text.substr(index, this->CHUNK_SIZE);
 
             // Synchronous write
-            boost::system::error_code error;
-            std::size_t bytes_sent = boost::asio::write(*client_socket, boost::asio::buffer(chunk), error);
+            std::size_t bytes_sent = boost::asio::write(
+                *client_socket, 
+                boost::asio::buffer(chunk), 
+                error
+            );
 
             // Check Whether Error Happen
             if (!error)
@@ -212,10 +266,12 @@ namespace SN_Server
         // The Variable To check For The Bytes Have Send
         std::size_t total_sent = 0;
 
+        // Error if Thrown
+        boost::system::error_code error;
+
         while (std::getline(text_file, chunk, static_cast<char>(EOF)) && !chunk.empty())
         {
             // Synchronous write
-            boost::system::error_code error;
             std::size_t bytes_sent = boost::asio::write(*client_socket, boost::asio::buffer(chunk), error);
 
             // Check Whether Error Happen
@@ -665,15 +721,15 @@ namespace SN_Server
         // DEBUG: For Testing Listenning Method Protocol
         // While the Server is Running
         // Still Listen
-        // std::string received_text;
-        std::string file_to_store = "decoded.png";
+        std::string received_text;
+        // std::string file_to_store = "decoded.png";
         // std::string file_to_store = "hello.txt";
         while (clients_connection_status == ClientConnectionStatus::ConnectionOpen)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            // clients_connection_status = this->GetText(client_socket, received_text);
+            clients_connection_status = this->GetText(client_socket, received_text);
             // clients_connection_status = this->GetTextBasedFile(client_socket, file_to_store);
-            clients_connection_status = this->GetBinaryFile(client_socket, file_to_store);
+            // clients_connection_status = this->GetBinaryFile(client_socket, file_to_store);
         }
 
         // Show A Log for close the client_socket
