@@ -139,13 +139,7 @@ namespace JB_Encode_Decode_Base64
         {
             std::cerr << "Error: Unable to open file for receiving data " << inputFilename << std::endl;
             return false;
-        }
-        else
-        {
-            // DEBUG: Fishy
-            std::cout << "Something Fishy Here!" << std::endl;
-        }
-        
+        } 
         
         std::string encoded((std::istreambuf_iterator<char>(inputFile)), std::istreambuf_iterator<char>());
 
@@ -157,12 +151,6 @@ namespace JB_Encode_Decode_Base64
             std::cerr << "Error: Unable to open file for receiving data " << outputFilename << std::endl;
             return false;
         }
-        else
-        {
-            // DEBUG: Fishy
-            std::cout << "Something Fishy Here!" << std::endl;
-        }
-        
 
         outputFile.write(reinterpret_cast<const char *>(decoded.data()), decoded.size());
         outputFile.flush();     // Flush the data into the file

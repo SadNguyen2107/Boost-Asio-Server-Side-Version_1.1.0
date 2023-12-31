@@ -3,6 +3,7 @@
 #include <fstream>
 #include <boost/filesystem.hpp>
 #include <iostream>
+#include <cstring>
 
 using namespace JB_Encode_Decode_Base64;
 namespace SN_Server
@@ -133,6 +134,86 @@ namespace SN_Server
         return this->CHUNK_SIZE;
     }
 
+    /**
+     * @brief Change A New End Signal to send to the Client
+     * Default: |end
+     * 
+     * @param end_signal new end_signal
+     */
+    void Server::SetEndSignal(const std::string_view& end_signal)
+    {
+        if (end_signal != "")
+        {
+            this->end_signal = end_signal;
+        }
+    }
+
+    /**
+     * @brief Get the current end_signal
+     * 
+     * @return std::string_view return the end_signal
+     */
+    std::string_view Server::GetEndSignal() const
+    {
+        return this->end_signal;
+    }
+
+    /**
+     * @brief Check Whether there is an end_signal in the given text
+     * 
+     * @param text text to check
+     * @return true if there is an end_signal
+     * @return false if there is no end_signal
+     */
+    bool Server::HasEndSignal(const std::string_view& text, std::size_t* index_to_del)
+    {
+        bool has_end_signal = false;
+
+        std::size_t found_pos = text.find(this->end_signal, 0);
+        if (found_pos != std::string::npos)
+        {
+            // Found an end_signal
+            std::cout << "Found: " << this->end_signal << " at index: " << found_pos << std::endl;
+            
+            // Return the index_to_del
+            *index_to_del = found_pos;
+
+            // Found an end_signal
+            has_end_signal = true;
+        }
+
+        return has_end_signal;
+    }
+
+    std::string Server::RemoveEndSignal(std::string& text, std::size_t end_signal_index)
+    {
+        return text.substr(0, end_signal_index);
+    }
+
+    /**
+     * @brief Send an end signal to the client_socket
+     * 
+     * @param client_socket the client_socket to send
+     */
+    void Server::SendEndSignal(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket)
+    {
+        // Error if Thrown
+        boost::system::error_code error;
+
+        // Send an end signal of the Text
+        boost::asio::write(
+            *client_socket,
+            boost::asio::buffer(this->end_signal),
+            error
+        );
+
+        // Check error
+        if (error)
+        {
+            std::cerr << "Error: " << error.message() << std::endl;
+        }
+    }
+
     //* INFO: For Sending Protocol Method
     /**
      * @brief For Sending Simple Text To a Specify client_socket
@@ -145,14 +226,20 @@ namespace SN_Server
         // The Variable To check For The Bytes Have Send
         std::size_t total_sent = 0;
 
+        // Error if Thrown
+        boost::system::error_code error;
+
         // Send every CHUNK_SIZE character per send
         for (size_t index = 0; index < text.size(); index += this->CHUNK_SIZE)
         {
             std::string_view chunk = text.substr(index, this->CHUNK_SIZE);
 
             // Synchronous write
-            boost::system::error_code error;
-            std::size_t bytes_sent = boost::asio::write(*client_socket, boost::asio::buffer(chunk), error);
+            std::size_t bytes_sent = boost::asio::write(
+                *client_socket, 
+                boost::asio::buffer(chunk), 
+                error
+            );
 
             // Check Whether Error Happen
             if (!error)
@@ -179,6 +266,9 @@ namespace SN_Server
         {
             std::cerr << "Not all data sent. Total sent: " << total_sent << " bytes out of " << text.size() << " bytes." << std::endl;
         }
+
+        //! Send an end signal
+        this->SendEndSignal(client_socket);
     }
 
     /**
@@ -212,11 +302,17 @@ namespace SN_Server
         // The Variable To check For The Bytes Have Send
         std::size_t total_sent = 0;
 
+        // Error if Thrown
+        boost::system::error_code error;
+
         while (std::getline(text_file, chunk, static_cast<char>(EOF)) && !chunk.empty())
         {
             // Synchronous write
-            boost::system::error_code error;
-            std::size_t bytes_sent = boost::asio::write(*client_socket, boost::asio::buffer(chunk), error);
+            std::size_t bytes_sent = boost::asio::write(
+                *client_socket,
+                boost::asio::buffer(chunk), 
+                error
+            );
 
             // Check Whether Error Happen
             if (!error)
@@ -257,6 +353,9 @@ namespace SN_Server
             std::cerr << "Not all data sent. Total sent: " << total_sent << " bytes out of "
                       << boost::filesystem::file_size(file_to_send) << " bytes." << std::endl;
         }
+
+        //! Send an end signal
+        this->SendEndSignal(client_socket);
     }
 
     /**
@@ -394,8 +493,20 @@ namespace SN_Server
                           << client_socket->remote_endpoint().port()
                           << std::endl;
 
-                // INFO: Receive Text Here
-                std::cout << "Received text: " << received_text << std::endl;
+                // Find If there is an end_signal 
+                // If yes -> Break The Loop
+                std::size_t index_to_del = -1;
+                if (this->HasEndSignal(received_text, &index_to_del))
+                {
+                    // Strip that end_signal part
+                    received_text = this->RemoveEndSignal(received_text, index_to_del);
+
+                    // INFO: Receive Text Here
+                    std::cout << "Received text: " << received_text << std::endl;
+
+                    // Break the loop because there is an end_signal
+                    break; 
+                }
             }
             else if (error == boost::asio::error::eof)
             {
@@ -449,7 +560,8 @@ namespace SN_Server
         }
 
         // Buffer for receiving data
-        char buffer[this->CHUNK_SIZE];
+        std::string buffer;
+        buffer.resize(this->CHUNK_SIZE);
 
         // Amount of bytes received
         std::size_t total_received = 0;
@@ -457,19 +569,31 @@ namespace SN_Server
         // Error Code if Thrown
         boost::system::error_code error;
 
-        while (true)
+        // Check if there is an end_signal
+        bool has_end_signal = false;    
+        while (!has_end_signal)
         {
             // Synchronous read
             std::size_t bytes_received = client_socket->read_some(
-                boost::asio::buffer(buffer, this->CHUNK_SIZE),
+                boost::asio::buffer(&buffer[0], this->CHUNK_SIZE),
                 error
             );
+
+            // Find If there is an end_signal 
+            // If yes -> Strip That end_signal
+            std::size_t index_to_del = -1;
+            if (this->HasEndSignal(buffer, &index_to_del))
+            {
+                // Have an end_signal
+                has_end_signal = true;
+                buffer = this->RemoveEndSignal(buffer, index_to_del);
+            }
 
             // If received bytes
             if (bytes_received > 0)
             {
                 // Synchronous write to the received file
-                received_file.write(buffer, bytes_received);
+                received_file.write(buffer.data(), bytes_received);
                 received_file.flush(); // Flush the data to the file
 
                 total_received += bytes_received;
@@ -537,7 +661,8 @@ namespace SN_Server
         }
 
         // Buffer for receiving data
-        char buffer[this->CHUNK_SIZE];
+        std::string buffer;
+        buffer.resize(this->CHUNK_SIZE);
 
         // Amount of bytes received
         std::size_t total_received = 0;
@@ -545,19 +670,31 @@ namespace SN_Server
         // Error Code if Thrown
         boost::system::error_code error;
 
-        while (true)
+        // Check if there is an end_signal
+        bool has_end_signal = false;   
+        while (!has_end_signal)
         {
             // Synchronous read
-            std::size_t bytes_received = client_socket->read_some(boost::asio::buffer(
-                buffer, this->CHUNK_SIZE),
+            std::size_t bytes_received = client_socket->read_some(
+                boost::asio::buffer(&buffer[0], this->CHUNK_SIZE),
                 error
             );
+
+            // Find If there is an end_signal 
+            // If yes -> Strip That end_signal
+            std::size_t index_to_del = -1;
+            if (this->HasEndSignal(buffer, &index_to_del))
+            {
+                // Have an end_signal
+                has_end_signal = true;
+                buffer = this->RemoveEndSignal(buffer, index_to_del);
+            }
 
             // If received bytes
             if (bytes_received > 0)
             {
                 // Synchronous write to the received file
-                received_file.write(buffer, bytes_received);
+                received_file.write(buffer.data(), bytes_received);
                 received_file.flush(); // Flush the data to the file
 
                 total_received += bytes_received;
@@ -600,7 +737,8 @@ namespace SN_Server
         decodeFileToFile(temp_file, file_to_store);
 
         // Remove the temporary file
-        std::remove(temp_file.c_str());
+        // TODO: Remember to Uncomment this line below 
+        // std::remove(temp_file.c_str());
 
         return client_connection_status;
     }
