@@ -47,7 +47,7 @@ namespace SN_Server
         std::size_t CHUNK_SIZE = 255;
 
         // End Signal of the Text
-        std::string_view end_signal = "|end";
+        std::string end_signal = "|end";
 
         //! PRIVATE METHODS SECTIONS
         //!========================================================
@@ -68,6 +68,10 @@ namespace SN_Server
         void Stop();
 
         bool IsRunning();
+
+        // Found If there is an end_signal in the Text
+        bool HasEndSignal(const std::string_view& text, std::size_t* index_to_del);
+        std::string RemoveEndSignal(std::string& text, std::size_t end_signal_index);
 
         // Set-Get The Chunk of data
         void SetChunkData(std::size_t new_chunk_size);
