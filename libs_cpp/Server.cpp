@@ -24,17 +24,6 @@ namespace SN_Server
         this->server_endpoint = boost::asio::ip::tcp::endpoint(
             this->server_ipv4_address, port
         );
-
-        //* Listening for any new incomming connection
-        this->acceptor_server = std::make_shared<boost::asio::ip::tcp::acceptor>(
-            this->io_context,
-            this->server_endpoint
-        );
-
-        // Show a Log of SET UP SERVER
-        std::cout << "Sever Configuration..." << std::endl;
-        std::cout << "Server Address: " << this->server_endpoint.address() << std::endl;
-        std::cout << "Server Port Opening: " << this->server_endpoint.port() << std::endl;
     }
 
     Server::~Server()
@@ -48,6 +37,12 @@ namespace SN_Server
      */
     void Server::Start()
     {
+        //* Listening for any new incomming connection
+        this->acceptor_server = std::make_shared<boost::asio::ip::tcp::acceptor>(
+            this->io_context,
+            this->server_endpoint
+        );
+
         // Change the Atomic Variable To True
         this->is_running = true;
 
@@ -55,6 +50,11 @@ namespace SN_Server
         this->listening_thread = std::make_shared<std::thread>([this]() { 
             this->AcceptConnections(); 
         });
+
+        // Show a Log of Opening The Listenning SERVER Phase
+        std::cout << "Sever Configuration..." << std::endl;
+        std::cout << "Server Address: " << this->server_endpoint.address() << std::endl;
+        std::cout << "Server Port Opening: " << this->server_endpoint.port() << std::endl;
     }
 
     /**
@@ -71,7 +71,7 @@ namespace SN_Server
         this->is_running = false;
 
         // Gracefully shutdown all the connections
-        for (std::shared_ptr<boost::asio::ip::tcp::socket> client_socket : clientsConnections)
+        for (std::shared_ptr<boost::asio::ip::tcp::socket> client_socket : this->clients_connections)
         {
             if (client_socket->is_open())
             {
@@ -85,7 +85,7 @@ namespace SN_Server
         }
 
         // Clear The Set of Client_socket
-        this->clientsConnections.clear();
+        this->clients_connections.clear();
 
         // Stop accepting new connections
         std::cout << "Stopped accepting new connections." << std::endl;
@@ -202,7 +202,7 @@ namespace SN_Server
         // Check If the File Open Successfully
         if (!text_file.is_open())
         {
-            std::cerr << "Error: Unable to open JSON file " << file_to_send << std::endl;
+            std::cerr << "Error: Unable to open TEXT file " << file_to_send << std::endl;
             return;
         }
 
@@ -244,6 +244,9 @@ namespace SN_Server
             std::cerr << "Error reading binary file: " << file_to_send << std::endl;
         }
 
+        // Close the File after Sending Successfully
+        text_file.close();
+
         // Check If All data has been sent
         if (total_sent == boost::filesystem::file_size(file_to_send))
         {
@@ -254,13 +257,10 @@ namespace SN_Server
             std::cerr << "Not all data sent. Total sent: " << total_sent << " bytes out of "
                       << boost::filesystem::file_size(file_to_send) << " bytes." << std::endl;
         }
-
-        // Close the File after Sending Successfully
-        text_file.close();
     }
 
     /**
-     * @brief Call This Function within server object to send a Text-Based Formats \n
+     * @brief Call This Function within server object to send a Binary File Formats \n
      * For Sending Files likes: \n
      * 1. Image Files (.jpg, .png, .gif, etc.) \n
      * 2. Binary Documents (.pdf, .docx, .xlsx, etc.) \n
@@ -361,8 +361,11 @@ namespace SN_Server
 
     //* INFO: For Receiving Protocol Method
     // Simple I/O Get Protocol
-    void Server::GetText(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, std::string &received_text)
+    ClientConnectionStatus Server::GetText(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, std::string &received_text)
     {
+        // Return Value
+        ClientConnectionStatus client_connection_status = ClientConnectionStatus::ConnectionOpen;
+
         // Buffer for Receiving Data
         char buffer[this->CHUNK_SIZE];
 
@@ -390,15 +393,25 @@ namespace SN_Server
                           << client_socket->remote_endpoint().address() << ":"
                           << client_socket->remote_endpoint().port()
                           << std::endl;
+
+                // INFO: Receive Text Here
+                std::cout << "Received text: " << received_text << std::endl;
             }
             else if (error == boost::asio::error::eof)
             {
                 // Connection closed by the client
                 std::cout << "Connection closed by the client." << std::endl;
+
+                // Change The Status of the Client_connection
+                client_connection_status = ClientConnectionStatus::ConnectionClose;
+
                 break; // Because The Client Close the Stream
             }
             else
             {
+                // Change The Status of the Client_connection
+                client_connection_status = ClientConnectionStatus::ConnectionClose;
+
                 // An error occurred
                 std::cerr << "Error: " << error.message() << std::endl;
                 break;
@@ -406,8 +419,12 @@ namespace SN_Server
         }
 
         // Process the received text (you can modify this part based on your needs)
-        std::cout << "Received text: " << received_text << std::endl;
-        std::cout << "With Total Bytes of: " << total_received << std::endl;
+        std::cout << "Client: " << client_socket->remote_endpoint().address() << ":"
+                                << client_socket->remote_endpoint().port()
+                                << std::endl;
+        std::cout << "Send A Total Bytes of: " << total_received << std::endl;
+
+        return client_connection_status;
     }
 
     /**
@@ -416,8 +433,11 @@ namespace SN_Server
      * @param client_socket The client_socket sent from
      * @param file_to_store The Place to store the Data
      */
-    void Server::GetTextBasedFile(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, const std::string &file_to_store)
+    ClientConnectionStatus Server::GetTextBasedFile(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, const std::string &file_to_store)
     {
+        // Return Value
+        ClientConnectionStatus client_connection_status = ClientConnectionStatus::ConnectionOpen;
+
         // Open The file to store the received data
         std::ofstream received_file(file_to_store, std::ios::binary | std::ios::app);
 
@@ -425,7 +445,7 @@ namespace SN_Server
         if (!received_file.is_open())
         {
             std::cerr << "Error: Unable to open file for receiving data " << file_to_store << std::endl;
-            return;
+            return client_connection_status;
         }
 
         // Buffer for receiving data
@@ -434,10 +454,16 @@ namespace SN_Server
         // Amount of bytes received
         std::size_t total_received = 0;
 
+        // Error Code if Thrown
+        boost::system::error_code error;
+
         while (true)
         {
             // Synchronous read
-            std::size_t bytes_received = client_socket->read_some(boost::asio::buffer(buffer, this->CHUNK_SIZE));
+            std::size_t bytes_received = client_socket->read_some(
+                boost::asio::buffer(buffer, this->CHUNK_SIZE),
+                error
+            );
 
             // If received bytes
             if (bytes_received > 0)
@@ -452,7 +478,16 @@ namespace SN_Server
                           << client_socket->remote_endpoint().port()
                           << std::endl;
             }
-            // The Client CLose the Stream
+            else if (error == boost::asio::error::eof)
+            {
+                // Connection closed by the client
+                std::cout << "Connection closed by the client." << std::endl;
+
+                // Change The Status of the Client_connection
+                client_connection_status = ClientConnectionStatus::ConnectionClose;
+
+                break; // Because The Client Close the Stream
+            }
             else
             {
                 // No more data or error on the Client Side
@@ -472,6 +507,8 @@ namespace SN_Server
 
         // Close the file after receiving data
         received_file.close();
+
+        return client_connection_status;
     }
 
     /**
@@ -480,8 +517,11 @@ namespace SN_Server
      * @param client_socket The client_socket sent from
      * @param file_to_store The file to place data into
      */
-    void Server::GetBinaryFile(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, const std::string &file_to_store)
+    ClientConnectionStatus Server::GetBinaryFile(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, const std::string &file_to_store)
     {
+        // Return Value
+        ClientConnectionStatus client_connection_status = ClientConnectionStatus::ConnectionOpen;
+
         //! Decode Base 64
         // Put All the data into a temp file
         std::string temp_file = createTempFile(file_to_store);
@@ -493,7 +533,7 @@ namespace SN_Server
         if (!received_file.is_open())
         {
             std::cerr << "Error: Unable to open file for receiving data " << file_to_store << std::endl;
-            return;
+            return client_connection_status;
         }
 
         // Buffer for receiving data
@@ -502,10 +542,16 @@ namespace SN_Server
         // Amount of bytes received
         std::size_t total_received = 0;
 
+        // Error Code if Thrown
+        boost::system::error_code error;
+
         while (true)
         {
             // Synchronous read
-            std::size_t bytes_received = client_socket->read_some(boost::asio::buffer(buffer, this->CHUNK_SIZE));
+            std::size_t bytes_received = client_socket->read_some(boost::asio::buffer(
+                buffer, this->CHUNK_SIZE),
+                error
+            );
 
             // If received bytes
             if (bytes_received > 0)
@@ -520,7 +566,16 @@ namespace SN_Server
                           << client_socket->remote_endpoint().port()
                           << std::endl;
             }
-            // The Client CLose the Stream
+            else if (error == boost::asio::error::eof)
+            {
+                // Connection closed by the client
+                std::cout << "Connection closed by the client." << std::endl;
+
+                // Change The Status of the Client_connection
+                client_connection_status = ClientConnectionStatus::ConnectionClose;
+
+                break; // Because The Client Close the Stream
+            }
             else
             {
                 // No more data or error on the Client Side
@@ -546,6 +601,8 @@ namespace SN_Server
 
         // Remove the temporary file
         std::remove(temp_file.c_str());
+
+        return client_connection_status;
     }
 
     //! PRIVATE METHODS SECTIONS
@@ -594,7 +651,7 @@ namespace SN_Server
             }, client_socket);
             client_thread.detach();
 
-            this->clientsConnections.insert(client_socket);
+            this->clients_connections.insert(client_socket);
         }
     }
 
@@ -602,16 +659,35 @@ namespace SN_Server
     {
         std::cout << "Handle Here!" << std::endl;
 
+        // To Check For the client_connection has closed 
+        ClientConnectionStatus clients_connection_status = ClientConnectionStatus::ConnectionOpen;
+
         // DEBUG: For Testing Listenning Method Protocol
         // While the Server is Running
         // Still Listen
         // std::string received_text;
         std::string file_to_store = "decoded.png";
-        while (this->is_running)
+        // std::string file_to_store = "hello.txt";
+        while (clients_connection_status == ClientConnectionStatus::ConnectionOpen)
         {
-            // this->GetText(client_socket, received_text);
-            // this->GetTextBasedFile(client_socket, file_to_store);
-            this->GetBinaryFile(client_socket, file_to_store);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            // clients_connection_status = this->GetText(client_socket, received_text);
+            // clients_connection_status = this->GetTextBasedFile(client_socket, file_to_store);
+            clients_connection_status = this->GetBinaryFile(client_socket, file_to_store);
         }
+
+        // Show A Log for close the client_socket
+        std::cout << "Close connection with Client: "
+                  << client_socket->remote_endpoint().address() << ":"
+                  << client_socket->remote_endpoint().port() << std::endl;
+
+        // If the client_socket closed
+        // -> Remove From The Set of client_sockets
+        this->clients_connections.erase(client_socket);
+
+        // Close the client_socket
+        client_socket->close();
+
+        // -> end Thread
     }
 } // namespace SN_Server
