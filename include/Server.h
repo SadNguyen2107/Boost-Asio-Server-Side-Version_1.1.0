@@ -12,6 +12,12 @@
 
 namespace SN_Server
 {
+    enum ClientConnectionStatus
+    {
+        ConnectionOpen = 0b1,
+        ConnectionClose = 0b10
+    };
+
     class Server
     {
     private:
@@ -35,9 +41,9 @@ namespace SN_Server
         std::shared_ptr<std::thread> listening_thread;
 
         // To Store All The Client Connections
-        std::set<std::shared_ptr<boost::asio::ip::tcp::socket>> clientsConnections;
+        std::set<std::shared_ptr<boost::asio::ip::tcp::socket>> clients_connections;
 
-        // Chunk Size of Data to Send
+        // Chunk Size of Data to Send/Get
         std::size_t CHUNK_SIZE = 255;
 
         //! PRIVATE METHODS SECTIONS
@@ -51,7 +57,7 @@ namespace SN_Server
         //* Method to Handle User Sending
         void HandleClient(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket);
     public:
-        Server(std::string_view server_ipv4_address = "127.0.0.1", std::uint16_t port = 6969);
+        Server(std::string_view server_ipv4_address = "127.0.0.1", std::uint16_t port = 5000);
         ~Server();
 
         // Simple I/O To Start and Stop
@@ -76,13 +82,13 @@ namespace SN_Server
         
         //========================================================================================================================
         // Simple I/O Get Protocol
-        void GetText(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, std::string &received_text);
+        ClientConnectionStatus GetText(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, std::string &received_text);
 
         // For Receiving Text-Based Formats Files
-        void GetTextBasedFile(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, const std::string &file_to_store);
+        ClientConnectionStatus GetTextBasedFile(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, const std::string &file_to_store);
 
         // For Receiving Binary Formats Files
-        void GetBinaryFile(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, const std::string &file_to_store);
+        ClientConnectionStatus GetBinaryFile(std::shared_ptr<boost::asio::ip::tcp::socket> client_socket, const std::string &file_to_store);
     };
 }
 
